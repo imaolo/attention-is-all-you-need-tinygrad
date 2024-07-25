@@ -45,7 +45,7 @@ class Attention:
         return self.proj(attn)
 
 
-class TransformerBlock:
+class Encoder:
 
     def __init__(self, dim, n_heads, dim_ff):
         self.attn = Attention(dim, n_heads)
@@ -73,7 +73,7 @@ batch_size = 20
 n_heads = 4
 d_ff = 512
 
-t_block = TransformerBlock(dim, n_heads, d_ff)
+t_block = Encoder(dim, n_heads, d_ff)
 t_block(Tensor.rand(batch_size, seq_len, dim)).realize()
 
 
