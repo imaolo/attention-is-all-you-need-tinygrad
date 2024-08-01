@@ -130,6 +130,7 @@ class Transformer(nn.Module):
 
         return F.log_softmax(self.proj(dec_out), dim=-1)
 
+# mps is slower
 device = torch.device('cpu')
 
 def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int) -> int:
