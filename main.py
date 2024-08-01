@@ -149,15 +149,15 @@ def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int) 
         loss = train_step(x_train.realize(), y_train.realize())
     return loss.item()
 
-seq_len = 4
-pred_factor = 2
-bound_factor = 5
-vocab_size = seq_len * pred_factor * bound_factor
-d_model = 50
-n_heads = 6
-d_ff = 512
-n_stacks = 6
-num_loops = 1000
+# seq_len = 4
+# pred_factor = 2
+# bound_factor = 5
+# vocab_size = seq_len * pred_factor * bound_factor
+# d_model = 50
+# n_heads = 6
+# d_ff = 512
+# n_stacks = 6
+# num_loops = 1000
 
-model = Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, seq_len)
-print(train(model, pred_factor, bound_factor, num_loops))
+# model = Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, seq_len)
+# print(train(model, pred_factor, bound_factor, num_loops))
