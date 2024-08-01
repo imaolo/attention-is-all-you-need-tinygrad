@@ -133,27 +133,27 @@ class Transformer(nn.Module):
 device = torch.device('cpu')
 
 def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int) -> int:
-    X_TRAIN = torch.arange(0, seq_len).int().unsqueeze(0).long()
+    X_TRAIN = torch.arange(0, model.max_len).int().unsqueeze(0).long()
     opt = optim.Adam(model.parameters())
-    empty_tensor = torch.zeros(seq_len).int().unsqueeze(0).to(device)
+    empty_tensor = torch.zeros(model.max_len).int().unsqueeze(0).to(device)
     lossfunc = nn.CrossEntropyLoss()
     model.to(device)
 
     def train_step(x, y):
         opt.zero_grad()
         outputs = model(x, empty_tensor)
-        loss: torch.Tensor = lossfunc(outputs.view(-1, vocab_size), y.view(-1))
+        loss: torch.Tensor = lossfunc(outputs.view(model.max_len, -1), y.view(-1))
         loss.backward()
         opt.step()
         return loss
     model.train()
-    limit_size = (vocab_size//((seq_len - 1)*pred_factor)) - 5
-    for i in range(1, 1000):
+    limit_size = (model.vocab_size//((model.max_len - 1)*pred_factor)) - bound_factor
+    for i in range(1, num_loops):
         train_scale = (i%limit_size)+1
         x_train = (X_TRAIN * train_scale).long().to(device)
         y_train = (x_train * pred_factor).long().to(device)
         loss = train_step(x_train, y_train)
-        print(loss.item())
+    return loss.item()
 
 # seq_len = 4
 # pred_factor = 2
