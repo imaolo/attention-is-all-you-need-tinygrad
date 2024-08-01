@@ -133,7 +133,7 @@ class Transformer(nn.Module):
 # mps is slower
 device = torch.device('cpu')
 
-def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int) -> int:
+def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int, compile=False) -> int:
     X_TRAIN = torch.arange(0, model.max_len).int().unsqueeze(0).long()
     opt = optim.Adam(model.parameters())
     empty_tensor = torch.zeros(model.max_len).int().unsqueeze(0).to(device)
@@ -147,6 +147,8 @@ def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int) 
         loss.backward()
         opt.step()
         return loss
+    if compile: train_step = torch.compile(train_step)
+
     model.train()
     limit_size = (model.vocab_size//((model.max_len - 1)*pred_factor)) - bound_factor
     for i in range(1, num_loops):
