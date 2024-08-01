@@ -96,17 +96,17 @@ class Decoder:
         x = self.attn2(x, enc_out, enc_out, mask)
         return self.ffn(x)
 
-
 class Transformer:
-    def __init__(self, d_model, n_heads, d_ff, n_layers, in_vocab_size, out_vocab_size, max_len, d_k=None, d_v=None):
+    def __init__(self, d_model, n_heads, d_ff, n_layers, vocab_size, max_len, d_k=None, d_v=None):
         super().__init__()
         self.max_len = max_len
-        self.in_embed = nn.Embedding(in_vocab_size, d_model)
-        self.out_embed = nn.Embedding(out_vocab_size, d_model)
+        self.vocab_size = vocab_size
+        self.in_embed = nn.Embedding(vocab_size, d_model)
+        self.out_embed = nn.Embedding(vocab_size, d_model)
         self.pos_embed = PositionalEncoding(d_model, max_len)
         self.encoders = [Encoder(d_model, n_heads, d_ff, d_k, d_v) for _ in range(n_layers)]
         self.decoders = [Decoder(d_model, n_heads, d_ff, d_k, d_v) for _ in range(n_layers)]
-        self.proj = nn.Linear(d_model, out_vocab_size)
+        self.proj = nn.Linear(d_model, vocab_size)
 
     def __call__(self, enc_in, dec_in):
         enc_in = self.in_embed(enc_in)
@@ -124,50 +124,40 @@ class Transformer:
         dec_out = dec_in
 
         return self.proj(dec_out).log_softmax()
+    
+def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int) -> int:
+    X_TRAIN: Tensor = Tensor.arange(0, model.max_len).unsqueeze(0).cast(dtypes.int)
+    opt = nn.optim.Adam(nn.state.get_parameters(model))
+    empty_tensor = Tensor.zeros(model.max_len).cast(dtypes.int).unsqueeze(0)
 
-# Input definition
+    @TinyJit
+    def train_step(x: Tensor, y: Tensor) -> Tensor:
+        with Tensor.train():
+            opt.zero_grad()
+            outputs = model(x, empty_tensor)
+            loss = outputs.sparse_categorical_crossentropy(y)
+            loss.backward()
+            opt.step()
+            return loss.realize()
+
+    # Training loop
+    limit_size = (model.vocab_size//((model.max_len - 1)*pred_factor)) - bound_factor
+    for i in range(1, num_loops):
+        train_scale = (i%limit_size)+1
+        x_train = (X_TRAIN * train_scale).cast(dtypes.int64)
+        y_train = (x_train * pred_factor).float()
+        loss = train_step(x_train.realize(), y_train.realize())
+    return loss.item()
+
 seq_len = 4
 pred_factor = 2
 bound_factor = 5
 vocab_size = seq_len * pred_factor * bound_factor
-
-# Model definition
 d_model = 50
 n_heads = 6
 d_ff = 512
-n_stacks = 8
+n_stacks = 6
+num_loops = 100
 
-# Training data
-X_TRAIN = Tensor.arange(0, seq_len).unsqueeze(0).cast(dtypes.int)
-Y_TRAIN = Tensor.one_hot((X_TRAIN * pred_factor).cast(dtypes.int), num_classes=vocab_size).float()
-
-# Model and optimizer
-model = Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, vocab_size, seq_len, 4, 5)
-opt = nn.optim.Adam(nn.state.get_parameters(model))
-
-empty_tensor = Tensor.zeros(seq_len).cast(dtypes.int).unsqueeze(0)
-
-@TinyJit
-def train_step(x: Tensor, y: Tensor) -> Tensor:
-    with Tensor.train():
-        opt.zero_grad()
-        outputs = model(x, empty_tensor)
-        loss = outputs.sparse_categorical_crossentropy(y)
-        loss.backward()
-        opt.step()
-        return loss.realize()
-
-# Training loop
-limit_size = (vocab_size//((seq_len - 1)*pred_factor)) - 5
-print(limit_size)
-for i in range(1, 1000):
-    train_scale = (i%limit_size)+1
-    x_train = (X_TRAIN * train_scale).cast(dtypes.int64)
-    y_train = (x_train * pred_factor).float()
-    loss = train_step(x_train.realize(), y_train.realize())
-    print(loss.item())
-
-x_train = (X_TRAIN * (limit_size + bound_factor)).cast(dtypes.int64)
-outputs = model(x_train, empty_tensor)
-print(x_train.numpy())
-print(Tensor.argmax(outputs, -1).numpy())
+model = Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, seq_len)
+print(train(model, pred_factor, bound_factor, num_loops))
