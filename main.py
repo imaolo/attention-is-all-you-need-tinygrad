@@ -78,7 +78,7 @@ class PositionalEncoding:
     def __call__(self, x):
         return x + self.encoding[:, :x.shape[1]]
 
-class Encoder():
+class Encoder:
     def __init__(self, d_model, n_heads, d_model_ff, d_k=None, d_v=None):
         self.attn = MultiHeadAttentionLayer(d_model, n_heads, d_k, d_v)
         self.ffn = FeedForwardLayer(d_model, d_model_ff)
