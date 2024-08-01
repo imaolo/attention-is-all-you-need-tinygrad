@@ -12,9 +12,14 @@ n_stacks = 6
 num_loops = 1000
 
 model = transformer_pt.Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, seq_len)
-with Timing("pytorch time: "):
+with Timing("pytorch uncompiled time: "):
     loss = transformer_pt.train(model, pred_factor, bound_factor, num_loops)
-print("pytorch loss: ", loss)
+print("pytorch uncompiled loss: ", loss)
+
+# takes too long
+# with Timing("pytorch compiled time: "):
+#     loss = transformer_pt.train(model, pred_factor, bound_factor, num_loops, True)
+# print("pytorch compiled loss: ", loss)
 
 model = transformer_tg.Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, seq_len)
 with Timing("tinygrad time: "):
