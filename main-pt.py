@@ -102,15 +102,16 @@ class Decoder(nn.Module):
         return self.ffn(x)
 
 class Transformer(nn.Module):
-    def __init__(self, d_model, n_heads, d_ff, n_layers, in_vocab_size, out_vocab_size, max_len, d_k=None, d_v=None):
+    def __init__(self, d_model, n_heads, d_ff, n_layers, vocab_size, max_len, d_k=None, d_v=None):
         super().__init__()
         self.max_len = max_len
-        self.in_embed = nn.Embedding(in_vocab_size, d_model)
-        self.out_embed = nn.Embedding(out_vocab_size, d_model)
+        self.vocab_size = vocab_size
+        self.in_embed = nn.Embedding(vocab_size, d_model)
+        self.out_embed = nn.Embedding(vocab_size, d_model)
         self.pos_embed = PositionalEncoding(d_model, max_len)
         self.encoders = nn.ModuleList([Encoder(d_model, n_heads, d_ff, d_k, d_v) for _ in range(n_layers)])
         self.decoders = nn.ModuleList([Decoder(d_model, n_heads, d_ff, d_k, d_v) for _ in range(n_layers)])
-        self.proj = nn.Linear(d_model, out_vocab_size)
+        self.proj = nn.Linear(d_model, vocab_size)
 
     def forward(self, enc_in, dec_in):
         enc_in = self.in_embed(enc_in)
@@ -129,48 +130,40 @@ class Transformer(nn.Module):
 
         return F.log_softmax(self.proj(dec_out), dim=-1)
 
-# Input definition
+device = torch.device('cpu')
+
+def train(model: Transformer, pred_factor:int, bound_factor:int, num_loops:int) -> int:
+    X_TRAIN = torch.arange(0, seq_len).int().unsqueeze(0).long()
+    opt = optim.Adam(model.parameters())
+    empty_tensor = torch.zeros(seq_len).int().unsqueeze(0).to(device)
+    lossfunc = nn.CrossEntropyLoss()
+    model.to(device)
+
+    def train_step(x, y):
+        opt.zero_grad()
+        outputs = model(x, empty_tensor)
+        loss: torch.Tensor = lossfunc(outputs.view(-1, vocab_size), y.view(-1))
+        loss.backward()
+        opt.step()
+        return loss
+    model.train()
+    limit_size = (vocab_size//((seq_len - 1)*pred_factor)) - 5
+    for i in range(1, 1000):
+        train_scale = (i%limit_size)+1
+        x_train = (X_TRAIN * train_scale).long().to(device)
+        y_train = (x_train * pred_factor).long().to(device)
+        loss = train_step(x_train, y_train)
+        print(loss.item())
+
 seq_len = 4
 pred_factor = 2
-bound_factor = 10
+bound_factor = 5
 vocab_size = seq_len * pred_factor * bound_factor
-
-# Model definition
 d_model = 50
 n_heads = 6
 d_ff = 512
-n_stacks = 8
+n_stacks = 6
+num_loops = 100
 
-device = torch.device('mps')
-
-
-# Training data
-X_TRAIN = torch.arange(0, seq_len).int().unsqueeze(0).long()
-Y_TRAIN = F.one_hot((X_TRAIN * pred_factor).long(), num_classes=vocab_size).float()
-
-# Model and optimizer
-model = Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, vocab_size, seq_len, 4, 5).to(device)
-opt = optim.Adam(model.parameters())
-
-empty_tensor = torch.zeros(seq_len).int().unsqueeze(0).to(device)
-
-assert torch.backends.mps.is_available()
-# Training loop
-model.train()
-lossfunc = nn.CrossEntropyLoss()
-limit_size = (vocab_size//((seq_len - 1)*pred_factor)) - 5
-for i in range(1, 1000):
-    train_scale = (i%limit_size)+1
-    x_train = (X_TRAIN * train_scale).long().to(device)
-    y_train = (x_train * pred_factor).long().to(device)
-    opt.zero_grad()
-    outputs = model(x_train, empty_tensor)
-    loss: torch.Tensor = lossfunc(outputs.view(-1, vocab_size), y_train.view(-1))
-    loss.backward()
-    opt.step()
-    print(loss.item())
-
-x_train = (X_TRAIN * (limit_size + 4)).long()
-outputs = model(x_train, empty_tensor)
-print(x_train)
-print(torch.argmax(outputs, -1))
+model = Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, seq_len)
+print(train(model, pred_factor, bound_factor, num_loops))
