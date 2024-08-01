@@ -2,7 +2,7 @@ from tinygrad import Tensor, nn, dtypes, TinyJit, Device
 import math
 
 # METAL is broken
-Device.DEFAULT = 'METAL'
+Device.DEFAULT = 'GPU'
 
 # https://arxiv.org/abs/1706.03762
 
@@ -157,7 +157,7 @@ d_model = 50
 n_heads = 6
 d_ff = 512
 n_stacks = 6
-num_loops = 100
+num_loops = 1000
 
 model = Transformer(d_model, n_heads, d_ff, n_stacks, vocab_size, seq_len)
 print(train(model, pred_factor, bound_factor, num_loops))
