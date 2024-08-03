@@ -2,4 +2,4 @@ Benchmark the transformer architecture from the paper "Attention Is All You Need
 
 Using torch device 'mps' is a lot slower than 'cpu'
 
-Using 'METAL' for tinygrad fails because a kernel is generate which has too many arguments. Use 'GPU' instead.
+Using 'METAL' for tinygrad fails because a kernel is generated which has too many arguments. Use 'GPU' instead.
